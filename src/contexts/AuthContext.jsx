@@ -1,16 +1,13 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import api from "../lib/axios"; // Pastikan sudah benar import 'api'
 import { TokenStore } from "../lib/tokenStore";
 
-// 1. Buat Context
 const AuthContext = createContext(null);
 
-// 2. Provider — membungkus seluruh aplikasi
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // cek sesi saat pertama load
+  const [loading, setLoading] = useState(true);
 
-  // Cek apakah ada sesi aktif saat app pertama kali dibuka
   useEffect(() => {
     const restore = async () => {
       if (!TokenStore.isLoggedIn()) {
@@ -19,15 +16,12 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        // Coba refresh token untuk dapatkan access token baru
         const rfToken = TokenStore.getRefreshToken();
-        const { data } = await axios.post("/auth/refresh", { refreshToken: rfToken });
-        TokenStore.setAccessToken(data.data.accessToken);
+        const { data } = await api.post("/auth/refresh", { refreshToken: rfToken });
+        const newToken = data.data.accessToken;
+        TokenStore.setAccessToken(newToken);
 
-        // Ambil data user
-        const { data: me } = await axios.get("/auth/me", {
-          headers: { Authorization: `Bearer ${data.data.accessToken}` },
-        });
+        const { data: me } = await api.get("/auth/me"); // Interceptor sudah menangani token
         setUser(me.data);
       } catch {
         TokenStore.clear();
@@ -35,28 +29,40 @@ export function AuthProvider({ children }) {
         setLoading(false);
       }
     };
-
     restore();
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const { data } = await axios.post("/auth/login", { email, password });
-    const { accessToken, refreshToken, user: userData } = data.data;
+  // PERUBAHAN: Sekarang menerima satu objek 'credentials'
+  const login = useCallback(async (credentials) => {
+    const response = await api.post("/auth/login", credentials);
+    const resData = response.data; // Ini adalah objek respon utama
+    
+    // Sesuaikan dengan struktur log yang ada di screenshot:
+    // accessToken dan refreshToken ada di level atas (root)
+    // user/userData biasanya ada di dalam resData.data
+    const accessToken = resData.accessToken;
+    const refreshToken = resData.refreshToken;
+    const userData = resData.data; // Mengambil user dari resData.data
+
+    console.log("Debug Auth:", { accessToken, userData }); // Cek apakah sudah muncul
+
     TokenStore.setAccessToken(accessToken);
     TokenStore.setRefreshToken(refreshToken);
-    setUser(userData);
+    
+    // Set user ke state
+    setUser(userData); 
   }, []);
 
-  const register = useCallback(async (name, email, password) => {
-    await axios.post("/auth/register", { name, email, password });
+  const register = useCallback(async (userData) => {
+    // userData berisi { name, email, password }
+    await api.post("/auth/register", userData);
   }, []);
 
   const logout = useCallback(async () => {
     try {
       const rfToken = TokenStore.getRefreshToken();
-      await axios.post("/auth/logout", { refreshToken: rfToken }, {
-        headers: { Authorization: `Bearer ${TokenStore.getAccessToken()}` },
-      });
+      // Gunakan 'api' bukan 'axios'
+      await api.post("/auth/logout", { refreshToken: rfToken });
     } catch { /* abaikan error logout */ }
     TokenStore.clear();
     setUser(null);
@@ -69,7 +75,6 @@ export function AuthProvider({ children }) {
   );
 }
 
-// 3. Custom hook — shortcut untuk konsumsi context
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth harus digunakan di dalam AuthProvider");

@@ -3,6 +3,7 @@ import { Navbar } from "../components/Navbar";
 import { TaskCard } from "../components/TaskCard";
 import { TaskForm } from "../components/TaskForm";
 import { taskService } from "../services/task.service";
+import { useRealTimeTasks } from "../hooks/useRealTimeTasks"; // <-- IMPORT HOOK
 
 export function TasksPage() {
   const [tasks, setTasks] = useState([]);
@@ -12,7 +13,9 @@ export function TasksPage() {
   const [editTarget, setEditTarget] = useState(null);
   const [filter, setFilter] = useState("ALL");
 
-  // Fetch semua task
+  // ── REAL-TIME: satu baris ini menangani semua update live ──
+  useRealTimeTasks(setTasks); // <-- TAMBAH
+
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -27,40 +30,38 @@ export function TasksPage() {
     }
   }, [filter]);
 
-  useEffect(() => {
-    fetchTasks();
+  useEffect(() => { 
+    fetchTasks(); 
   }, [fetchTasks]);
 
-  // CREATE
   const handleCreate = async (formData) => {
     const newTask = await taskService.create(formData);
-    setTasks((prev) => [newTask, ...prev]);
+    // Tambahkan ke list lokal (Socket.IO juga akan emit ke user lain)
+    // Deteksi duplikat ada di useRealTimeTasks
+    setTasks(prev => [newTask, ...prev]);
     setShowForm(false);
   };
 
-  // EDIT — buka form dengan data task yang ada
   const handleEditClick = (task) => {
     setEditTarget(task);
     setShowForm(true);
   };
 
-  // UPDATE
   const handleUpdate = async (formData) => {
-    const updated = await taskService.update(editTarget.id, formData);
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    await taskService.update(editTarget.id, formData);
+    // Socket.IO akan update tasks array via onTaskUpdated listener
     setShowForm(false);
     setEditTarget(null);
   };
 
-  // DELETE
   const handleDelete = async (id) => {
     if (!window.confirm("Yakin ingin menghapus task ini?")) return;
     await taskService.remove(id);
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    // Socket.IO akan hapus dari array via onTaskDeleted listener
   };
 
-  const handleCloseForm = () => {
-    setShowForm(false);
+  const handleCloseForm = () => { 
+    setShowForm(false); 
     setEditTarget(null);
   };
 
@@ -74,45 +75,36 @@ export function TasksPage() {
             + Task Baru
           </button>
         </div>
-
-        {/* Filter Status */}
+        
         <div className="filter-bar">
-          {["ALL", "TODO", "IN_PROGRESS", "DONE"].map((s) => (
-            <button
-              key={s}
-              className={`filter-btn ${filter === s ? "active" : ""}`}
+          {["ALL", "TODO", "IN_PROGRESS", "DONE"].map(s => (
+            <button 
+              key={s} 
+              className={`filter-btn ${filter === s ? "active" : ""}`} 
               onClick={() => setFilter(s)}
             >
-              {s === "ALL"
-                ? "Semua"
-                : s === "TODO"
-                  ? "Belum Dimulai"
-                  : s === "IN_PROGRESS"
-                    ? "Sedang Dikerjakan"
-                    : "Selesai"}
+              {s === "ALL" ? "Semua" : s === "TODO" ? "Belum Dimulai" : s === "IN_PROGRESS" ? "Sedang" : "Selesai"}
             </button>
           ))}
         </div>
 
-        {/* Konten */}
         {loading && <p className="state-msg">Memuat task...</p>}
         {error && <p className="state-msg error">{error}</p>}
         {!loading && !error && tasks.length === 0 && (
-          <p className="state-msg">Belum ada task. Buat task pertamamu!</p>
+          <p className="state-msg">Belum ada task.</p>
         )}
 
         <div className="task-grid">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
+          {tasks.map(task => (
+            <TaskCard 
+              key={task.id} 
+              task={task} 
               onEdit={handleEditClick}
-              onDelete={handleDelete}
+              onDelete={handleDelete} 
             />
           ))}
         </div>
 
-        {/* Modal Form */}
         {showForm && (
           <TaskForm
             onSubmit={editTarget ? handleUpdate : handleCreate}

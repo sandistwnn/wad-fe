@@ -15,12 +15,19 @@ export function RegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm();
 
-  const password = watch("password"); // pantau nilai password untuk validasi konfirmasi
+  const password = watch("password");
 
-  const onSubmit = async ({ name, email, password }) => {
+  // Perubahan: Mengirim data sebagai satu objek { name, email, password }
+  const onSubmit = async (data) => {
     setApiError(null);
     try {
-      await authRegister(name, email, password);
+      // Kirim seluruh data form (termasuk name, email, password) sebagai satu objek
+      await authRegister({
+        name: data.name,
+        email: data.email,
+        password: data.password
+      });
+      
       navigate("/login", { state: { message: "Registrasi berhasil! Silakan login." } });
     } catch (err) {
       const msg = err.response?.data?.error?.message || "Registrasi gagal";
@@ -45,7 +52,13 @@ export function RegisterPage() {
             <label>Email</label>
             <input
               type="email"
-              {...register("email", { required: "Email wajib diisi" })}
+              {...register("email", { 
+                required: "Email wajib diisi",
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Format email tidak valid",
+                },
+              })}
             />
             {errors.email && (
               <span className="error">{errors.email.message}</span>
