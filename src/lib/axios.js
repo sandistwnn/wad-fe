@@ -3,7 +3,9 @@ import { TokenStore } from "./tokenStore";
 
 // Instance utama untuk semua request API
 const api = axios.create({
-  baseURL: "/api/v1",
+  // V-- UBAH BARIS INI --V
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/v1` : "http://localhost:3000/api/v1",
+  
   timeout: 10000,
   headers: { "Content-Type": "application/json" },
 });
@@ -54,9 +56,19 @@ api.interceptors.response.use(
         const refreshToken = TokenStore.getRefreshToken();
         if (!refreshToken) throw new Error("No refresh token");
 
+        // Perhatikan ini memanggil /auth/refresh (pastikan di backend rutenya sesuai)
         const { data } = await axios.post("/auth/refresh", { refreshToken });
         const newToken = data.data.accessToken;
+        
         TokenStore.setAccessToken(newToken);
+        
+        // ── KODE BARU DITAMBAHKAN DI SINI ─────────────────────────
+        // Beri tahu Socket.IO (dan komponen lain) bahwa token baru saja diperbarui
+        window.dispatchEvent(new CustomEvent("token:refreshed", {
+          detail: { token: newToken }
+        }));
+        // ──────────────────────────────────────────────────────────
+
         processQueue(null, newToken);
 
         orig.headers.Authorization = `Bearer ${newToken}`;

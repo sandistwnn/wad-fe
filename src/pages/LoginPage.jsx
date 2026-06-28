@@ -14,12 +14,16 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm();
 
-  const onSubmit = async ({ email, password }) => {
+  // PERUBAHAN DI SINI: Tangkap parameter sebagai 'data' (objek)
+  const onSubmit = async (data) => {
     setApiError(null);
     try {
-      await login(email, password);
-      navigate("/tasks");
+      console.log("Mencoba login dengan data:", data); // JEJAK 1
+      await login(data);
+      console.log("Login sukses! Akan berpindah halaman..."); // JEJAK 2
+      navigate("/tasks", { replace: true });
     } catch (err) {
+      console.log("Error login:", err); // JEJAK 3
       const msg = err.response?.data?.error?.message || "Login gagal";
       setApiError(msg);
     }
@@ -30,6 +34,7 @@ export function LoginPage() {
       <div className="auth-card">
         <h1>Masuk ke Akun</h1>
         <p>Web Advanced Development — Task Manager</p>
+        
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="form-group">
             <label>Email</label>
